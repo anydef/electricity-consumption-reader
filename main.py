@@ -8,7 +8,7 @@ uart_test = UART(0, baudrate=9600, tx=Pin(0), rx=Pin(1), bits=8, parity=None, st
 init = uart_test.init()
 
 
-uart_wire = UART(1, baudrate=9600, tx=Pin(4), rx=Pin(5), bits=8, parity=None, stop=1)
+uart_wire = UART(1, baudrate=9600, tx=Pin(4), rx=Pin(5), bits=8,  parity=None, stop=1)
 uart_wire.init()
 
 async def test_sender():
