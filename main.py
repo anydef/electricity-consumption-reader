@@ -23,7 +23,7 @@ async def receiver():
         res = await sreader.readline()
         print('Recieved', res)
 
-
+print("Registering tasks.")
 loop = asyncio.get_event_loop()
 # loop.create_task(test_sender())
 loop.create_task(receiver())
