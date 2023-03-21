@@ -1,7 +1,6 @@
 import uasyncio as asyncio
 from machine import UART, Pin
 from utime import sleep
-from test import random_message
 from ubinascii import unhexlify
 from sml_parser_light import SmlStreamReader, sml_get_entry, OBIS_NAMES
 
