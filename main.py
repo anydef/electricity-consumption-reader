@@ -13,7 +13,6 @@ async def receiver():
     sreader = asyncio.StreamReader(uart_wire)
     obis = OBIS_NAMES.keys()
 
-
     sml_stream_reader = SmlStreamReader()
 
     while True:
@@ -38,7 +37,6 @@ async def receiver():
 
 print("Registering tasks.")
 
-run_test()
 loop = asyncio.get_event_loop()
 
 # loop.create_task(test_sender())
