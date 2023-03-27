@@ -1,3 +1,5 @@
+# This is reduced copy of https://github.com/jensstockhausen/SmlParserLight by https://github.com/jensstockhausen/
+###
 
 try:
     # hexlify for micropython
@@ -83,16 +85,16 @@ SmlUnits = {
 # https://www.promotic.eu/en/pmdoc/Subsystems/Comm/PmDrivers/IEC62056_OBIS.htm
 # adjust for translations
 OBIS_NAMES = {
-    '8181c78203ff': 'Hersteller-Identifikation',
-    '0100000009ff': 'Geräteeinzelidentifikation',
-    '0100010800ff': 'Zählerstand Total',
-    '0100010801ff': 'Zählerstand Tarif 1',
-    '0100010802ff': 'Zählerstand Tarif 2',
-    '0100020800ff': 'Wirkenergie Total',
-    '0100020801ff': 'Unknown 1',
-    '0100020802ff': 'Unknown 2',
-    '01000f0700ff': 'Unknown 3',
-    '8181c78205ff': 'Öffentlicher Schlüssel',
+    '8181c78203ff': ('Vendor ID', 'vendor-id'),
+    '0100000009ff': ('Device ID', 'device-id'),
+    '0100010800ff': ('Reading Total', 'reading-total'),
+    '0100010801ff': ('Reading Tariff 1', 'reading-tariff-1'),
+    '0100010802ff': ('Reading Tariff 2', 'reading-tariff-2'),
+    '0100020800ff': ('Effective Consumoption Total', 'effective-reading-total'),
+    '0100020801ff': ('Unknown 1', 'unknown-1'),
+    '0100020802ff': ('Unknown 2', 'unknown-2'),
+    '01000f0700ff': ('Effective Consumption 1', 'effective-consumption-1'),
+    '8181c78205ff': ('Public Key', 'public-key'),
 }
 
 
@@ -130,6 +132,7 @@ CRC16_X25_TABLE = (
     0xF78F, 0xE606, 0xD49D, 0xC514, 0xB1AB, 0xA022, 0x92B9, 0x8330,
     0x7BC7, 0x6A4E, 0x58D5, 0x495C, 0x3DE3, 0x2C6A, 0x1EF1, 0x0F78
 )
+
 
 def get_crc(buf):
     crc = 0xffff
@@ -201,6 +204,7 @@ class SmlField():
         self.value = value
         self.hex_value = bin_value
 
+
 class SmlEntry():
 
     def __init__(self, obis, status, val_time, unit, scaler, base_value, value_signature):
@@ -223,7 +227,8 @@ class SmlEntry():
 
     def __str__(self):
 
-        str = "{} ({})  ".format(self.obis, OBIS_NAMES.get(self.obis))
+        name, _id = OBIS_NAMES.get(self.obis)  # type: ignore
+        str = "{} ({})  ".format(self.obis, name)
 
         if self.base_value.date_type_name != "string":
             str += "{}*10^{}: {}[{}]".format(self.base_value.value, self.scaler.value,
@@ -231,7 +236,6 @@ class SmlEntry():
         else:
             str += "{}".format(self.base_value.value)
         return str
-
 
 
 def sml_parse_fields_from_position(message, position):
@@ -259,26 +263,26 @@ def sml_parse_fields_from_position(message, position):
         elif data_type == 0x50:
             date_type_name = "signed"
             if len(bin_value) == 1:
-                value =  struct.unpack('>b', bin_value)[0]
+                value = struct.unpack('>b', bin_value)[0]
             elif len(bin_value) == 2:
-                value =  struct.unpack('>h', bin_value)[0]
+                value = struct.unpack('>h', bin_value)[0]
             elif len(bin_value) == 4:
-                value =  struct.unpack('>i', bin_value)[0]
+                value = struct.unpack('>i', bin_value)[0]
             elif len(bin_value) == 8:
-                value =  struct.unpack('>q', bin_value)[0]
+                value = struct.unpack('>q', bin_value)[0]
             else:
                 value = 0
 
         elif data_type == 0x60:
             date_type_name = "unsigned"
             if len(bin_value) == 1:
-                value =  struct.unpack('>B', bin_value)[0]
+                value = struct.unpack('>B', bin_value)[0]
             elif len(bin_value) == 2:
-                value =  struct.unpack('>H', bin_value)[0]
+                value = struct.unpack('>H', bin_value)[0]
             elif len(bin_value) == 4:
-                value =  struct.unpack('>I', bin_value)[0]
+                value = struct.unpack('>I', bin_value)[0]
             elif len(bin_value) == 8:
-                value =  struct.unpack('>Q', bin_value)[0]
+                value = struct.unpack('>Q', bin_value)[0]
             else:
                 value = 0
 
@@ -291,7 +295,8 @@ def sml_parse_fields_from_position(message, position):
                 value = hexlify(bin_value).decode('ascii')
 
         position = position + length
-        fields.append(SmlField(date_type_name=date_type_name, value=value, bin_value=bin_value))
+        fields.append(SmlField(date_type_name=date_type_name,
+                      value=value, bin_value=bin_value))
 
     return fields
 
@@ -306,17 +311,13 @@ def sml_get_entry(frame, obis):
     pos = pos + len(obis)
 
     # enable to debug the parsing of the entry
-    #print("obis {}".format(hexlify(obis).decode('ascii')))
-    #print("{}".format(hexlify(message[pos-len(obis):pos+40]).decode('ascii')))
-    #print('^^'*len(obis))
+    # print("obis {}".format(hexlify(obis).decode('ascii')))
+    # print("{}".format(hexlify(message[pos-len(obis):pos+40]).decode('ascii')))
+    # print('^^'*len(obis))
 
     fields = sml_parse_fields_from_position(frame, pos)
 
-    sml_entry = SmlEntry(obis=hexlify(obis).decode('ascii'),
-                         status=fields[0], val_time=fields[1],
-                         unit=fields[2], scaler=fields[3], base_value=fields[4],
-                         value_signature=fields[5])
-
-    return sml_entry
-
-
+    return SmlEntry(obis=hexlify(obis).decode('ascii'),
+                    status=fields[0], val_time=fields[1],
+                    unit=fields[2], scaler=fields[3], base_value=fields[4],
+                    value_signature=fields[5])

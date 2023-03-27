@@ -1,59 +1,57 @@
 from random import randrange
 from ubinascii import unhexlify
-
+from machine import UART, Pin
 from sml_parser_light import SmlStreamReader, sml_get_entry
+import uasyncio as asyncio
+from sml_parser_light import SmlStreamReader, sml_get_entry, OBIS_NAMES
+from samples import samples
+import config
 
-test_messages = [
-    b'\xff\xffrb\x01e\x11A\xe3\xd7zw\x07\x81\x81\xc7\x82\x03\xff\x01\x01\x01\x01\x04DZG\x01w\x07\x01\x00\x00\x00\t\xff\x01\x01\x01\x01\x0b\t\x01DZG\x00\x01_)\x88\x01w\x07\x01\x00\x01\x08\x00\xffe\x00\x01\x01\x82\x01b\x1eR\xffY\x00\x00\x00\x00\x0f\xb1TH\x01w\x07\x01\x00\x01\x08\x01\xff\x01\x01b\x1eR\xffY\x00\x00\x00\x00\x0f\xb0\xd5\xf3\x01w\x07\x01\x00\x01\x08\x02\xff\x01\x01b\x1eR\xffY\x00\x00\x00\x00\x00\x00>\x16\x01w\x07\x01\x00\x02\x08\x00\xffe\x00\x01\x01\x82\x01b\x1eR\xffY\x00\x00\x00\x00\x00\x00\xd8\x81\x01w\x07\x01\x00\x02\x08\x01\xff\x01\x01b\x1eR\xffY\x00\x00\x00\x00\x00\x00uU\x01w\x07\x01\x00\x02\x08\x02\xff\x01\x01b\x1eR\xffY\x00\x00\x00\x00\x00\x00#\xbf\x01w\x07\x01\x00\x0f\x07\x00\xff\x01\x01b\x1bR\x00e\x00\x00\x01Y\x01w\x07\x81\x81\xc7\x82\x05\xff\x01\x01\x01\x01\x83\x02\xe6g\xd7\x96\xca\xe0]T\xf7\x84\xe5\xd2q\x15\xbe0\xb4`7\xb7n\x02tB\xb3\xf9\xb5\x93y\xbe\xee\x0f901\xd6\xb6L|\x83Z\xd4T#\x03[\x9ew\x01\x01\x01c*\x8a\x00v\t\x80\x00\x00\x00\x02izqb\x00b\x00rc\x02\x01q\x01c\x11\xa2\x00\x00\x00\x1b\x1b\x1b\x1b\x1a\x02\x8f\x1c\x1b\x1b\x1b\x1b\x01\x01\x01\x01v\t\x80\x00\x00\x00\x02izrb\x00b\x00rc\x01\x01v\x01\x0b0023013768\x0b\xff\xff\xff\xff\xff\xffl\xff\xff\xff\x0b\t\x01DZG\x00\x01_)\x88\x01\x01c\xaa\xe7\x00v\t\x80\x00\x00\x00\x02izsb\x00b\x00rc\x07\x01w\x0b0023013768\x0b\t\x01DZG\x00\x01_)\x88\x07\x01\x00b\n'
-    ,b'\xff\xffrb\x01e\x11A\xe3\xd9zw\x07\x81\x81\xc7\x82\x03\xff\x01\x01\x01\x01\x04DZG\x01w\x07\x01\x00\x00\x00\t\xff\x01\x01\x01\x01\x0b\t\x01DZG\x00\x01_)\x88\x01w\x07\x01\x00\x01\x08\x00\xffe\x00\x01\x01\x82\x01b\x1eR\xffY\x00\x00\x00\x00\x0f\xb1TJ\x01w\x07\x01\x00\x01\x08\x01\xff\x01\x01b\x1eR\xffY\x00\x00\x00\x00\x0f\xb0\xd5\xf5\x01w\x07\x01\x00\x01\x08\x02\xff\x01\x01b\x1eR\xffY\x00\x00\x00\x00\x00\x00>\x16\x01w\x07\x01\x00\x02\x08\x00\xffe\x00\x01\x01\x82\x01b\x1eR\xffY\x00\x00\x00\x00\x00\x00\xd8\x81\x01w\x07\x01\x00\x02\x08\x01\xff\x01\x01b\x1eR\xffY\x00\x00\x00\x00\x00\x00uU\x01w\x07\x01\x00\x02\x08\x02\xff\x01\x01b\x1eR\xffY\x00\x00\x00\x00\x00\x00#\xbf\x01w\x07\x01\x00\x0f\x07\x00\xff\x01\x01b\x1bR\x00e\x00\x00\x01W\x01w\x07\x81\x81\xc7\x82\x05\xff\x01\x01\x01\x01\x83\x02\xe6g\xd7\x96\xca\xe0]T\xf7\x84\xe5\xd2q\x15\xbe0\xb4`7\xb7n\x02tB\xb3\xf9\xb5\x93y\xbe\xee\x0f901\xd6\xb6L|\x83Z\xd4T#\x03[\x9ew\x01\x01\x01c]\n'
-    ,b'\x00v\t\x80\x00\x00\x00\x02iztb\x00b\x00rc\x02\x01q\x01c\xd5\xa9\x00\x00\x00\x1b\x1b\x1b\x1b\x1a\x02\x17$\x1b\x1b\x1b\x1b\x01\x01\x01\x01v\t\x80\x00\x00\x00\x02izub\x00b\x00rc\x01\x01v\x01\x0b0023013768\x0b\xff\xff\xff\xff\xff\xffm\xff\xff\xff\x0b\t\x01DZG\x00\x01_)\x88\x01\x01c\xa4C\x00v\t\x80\x00\x00\x00\x02izvb\x00b\x00rc\x07\x01w\x0b0023013768\x0b\t\x01DZG\x00\x01_)\x88\x07\x01\x00b\n'
-]
-
-
+cfg = config.read_config()
 
 
-def run_test():
-    print("Starting test")
-    obis = [
-        "0100010800ff",
-        "0100020800ff",
-        "0100100700ff",
-        "0100240700ff",
-        "0100380700ff",
-        "0100480700ff",
-        "010048ffffff", # not part of sample message
-    ]
-
-    sml_stream_reader = SmlStreamReader()
-    for idx, message in enumerate(test_messages):
-        print(f"Testing record {idx}")
-        byte_array = message
-        for read_pos in range(0, len(byte_array), 10):
-            # add bytes to reader, this sould be the output form the UART
-            sml_stream_reader.add(byte_array[read_pos:read_pos+10])
-            sml_frame = sml_stream_reader.get_frame()
-
-            # full frame was read and parsing can start
-            if sml_frame is not None:
-
-                # now extract the entries
-                for o in obis:
-                    entry = sml_get_entry(sml_frame, obis=unhexlify(o))
-
-                    # entry was found
-                    if entry != None:
-                        print("{}".format(entry))
-                        print("-> {}[{}]".format(entry.sensor_value(), entry.sensor_unit()))
-                    else:
-                        print("ERROR: {} not found".format(o))
-            else:
-                # pass
-                print("Frame was empty")
-
-run_test()
-
-def random_message():
-    print("sending message")
-    return test_messages[randrange(len(test_messages))]
+uart_test = UART(0, baudrate=9600, tx=Pin(0), rx=Pin(1), bits=8, parity=None, stop=1)
 
 
+sml_stream_reader = SmlStreamReader()
+
+def test_parser(line):
+    byte_array = line
+    for read_pos in range(0, len(byte_array), 10):
+        # add bytes to reader, this sould be the output form the UART
+        sml_stream_reader.add(byte_array[read_pos:read_pos+10])
+        sml_frame = sml_stream_reader.get_frame()
+
+        # full frame was read and parsing can start
+        if sml_frame is not None:
+            # now extract the entries
+            for o in OBIS_NAMES.keys():
+                print("OBI", o)
+                entry = sml_get_entry(sml_frame, obis=unhexlify(o))
+
+                # entry was found
+                if entry != None:
+                    print("{}".format(entry))
+                    print("-> {}[{}]".format(entry.sensor_value(), entry.sensor_unit()))
+                else:
+                    print("No record found")
+
+
+async def emit_samples():
+    if not cfg.get('test', False):
+        print('Skip test')
+        return
+   
+    print('Start test')
+
+    swriter = asyncio.StreamWriter(uart_test, {})
+
+    while True:
+        print('Run test.')
+
+        for line in samples:
+            # test_parser(line)
+            # asyncio.sleep(1)
+            await swriter.awrite(line)
+            await asyncio.sleep(3)
+        await asyncio.sleep(5)

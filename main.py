@@ -1,45 +1,49 @@
 import uasyncio as asyncio
+import boot
+
+from uasyncio import Event
+from heartbeat import heartbeat
 from machine import UART, Pin
-from utime import sleep
-from test import random_message, run_test
-from ubinascii import unhexlify
-from sml_parser_light import SmlStreamReader, sml_get_entry, OBIS_NAMES
+from test import emit_samples
+from uart_receiver import Meter, receiver
+from pushgateway_client import send_readings
+import webserver_async as webserver
+
+uart_connection = UART(1, baudrate=9600,
+                       tx=Pin(4),
+                       rx=Pin(5),
+                       bits=8,
+                       parity=None,
+                       stop=1)
+uart_connection.init()
+
+message_event = Event()
+meters: dict[str, Meter] = {
+    '0100010800ff': Meter(name="electricity_reading_total",
+                          display_name="Reading Total",
+                          unit='Wh',
+                          obi_key='0100010800ff',
+                          ),
+    '01000f0700ff': Meter(name="electricity_reading_effective",
+                          display_name="Reading Effective",
+                          unit='Wh',
+                          obi_key='01000f0700ff',
+                          )
+}
 
 
-uart_wire = UART(1, baudrate=9600, tx=Pin(4), rx=Pin(5), bits=8,  parity=None, stop=1)
-uart_wire.init()
+async def main():
+    boot.init()
 
-async def receiver():
-    sreader = asyncio.StreamReader(uart_wire)
-    obis = OBIS_NAMES.keys()
+    asyncio.create_task(asyncio.start_server(
+        webserver.create_server(meters=meters), "0.0.0.0", 80
+    ))
+    asyncio.create_task(receiver(uart=uart_connection, meters=meters, event=message_event))
+    asyncio.create_task(send_readings(event=message_event, meters=meters))
+    asyncio.create_task(emit_samples())
+    await heartbeat()
 
-    sml_stream_reader = SmlStreamReader()
-
-    while True:
-        byte_array = await sreader.readline()
-
-        for read_pos in range(0, len(byte_array), 10):
-            # add bytes to reader, this sould be the output form the UART
-            sml_stream_reader.add(byte_array[read_pos:read_pos+10])
-            sml_frame = sml_stream_reader.get_frame()
-
-            # full frame was read and parsing can start
-            if sml_frame is not None:
-                # now extract the entries
-                for o in obis:
-                    entry = sml_get_entry(sml_frame, obis=unhexlify(o))
-
-                    # entry was found
-                    if entry != None:
-                        print("{}".format(entry))
-                        print("-> {}[{}]".format(entry.sensor_value(), entry.sensor_unit()))
-
-
-print("Registering tasks.")
-
-loop = asyncio.get_event_loop()
-
-# loop.create_task(test_sender())
-
-loop.create_task(receiver())
-loop.run_forever()
+try:
+    asyncio.run(main())
+finally:
+    asyncio.new_event_loop()
