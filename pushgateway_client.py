@@ -7,7 +7,7 @@ from uasyncio import Event
 cfg = config.read_config()
 host = cfg['pushgateway_host']
 port = int(cfg['pushgateway_port'])
-job = "gas-meter"
+job = "electricity-meter"
 instance = cfg['instance']
 
 
